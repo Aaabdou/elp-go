@@ -9,7 +9,15 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	//"sync"
+
+	//"net"
+	"sync"
+)
+
+const (
+	CONN_HOST = "localhost"
+	CONN_PORT = "3333"
+	CONN_TYPE = "tcp"
 )
 
 type line struct {
@@ -19,16 +27,30 @@ type line struct {
 
 func main() {
 	start := time.Now()
-	matrixA, err := readMatrixFromFile("matrix_a.txt")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	matrixB, err := readMatrixFromFile("matrix_b.txt")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	var wg sync.WaitGroup
+	var matrixA [][]int
+	var matrixB [][]int
+	wg.Add(2)
+	go func() {
+		var errA error
+		matrixA, errA = readMatrixFromFile("matrix_a.txt")
+		if errA != nil {
+			fmt.Errorf("Can't read Matrix A")
+		}
+		wg.Done()
+	}()
+	go func() {
+
+		var errB error
+		matrixB, errB = readMatrixFromFile("matrix_b.txt")
+		if errB != nil {
+			fmt.Errorf("Can't read Matrix B")
+		}
+		wg.Done()
+	}()
+	wg.Wait()
+	fmt.Println(matrixA)
+	fmt.Println(matrixB)
 
 	result, err := matrixMultiply(matrixA, matrixB)
 	if err != nil {
