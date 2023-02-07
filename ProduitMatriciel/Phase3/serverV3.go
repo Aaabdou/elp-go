@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 const (
@@ -23,6 +24,14 @@ type line struct {
 }
 
 func main() {
+	wg := new(sync.WaitGroup)
+	chConn := make(chan net.Conn)
+	running := true
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go worker(chConn, wg)
+	}
+	fmt.Println("Server starting...")
 	l, err := net.Listen(SERV_TYPE, SERV_HOST+":"+SERV_PORT)
 	defer l.Close()
 	if err != nil {
@@ -31,16 +40,39 @@ func main() {
 	}
 
 	// Listen for an incoming connection.
-
-	for true {
+	go user(&running)
+	for running {
 		conn, err := l.Accept()
+
 		if err != nil {
 			fmt.Println("Error accepting: ", err.Error())
 			os.Exit(1)
 		}
-		client_exit := false
+		chConn <- conn
+
+	}
+}
+func user(run *bool) {
+	fmt.Println("If you want to close the server, type 1")
+	var answer string
+	for true {
+		fmt.Scanln(&answer)
+		if answer == "1" {
+			*run = false
+			break
+		} else {
+			fmt.Println("Didn't understand your request")
+			fmt.Println("If you want to close the server, type 1")
+		}
+	}
+
+}
+func worker(can chan net.Conn, wg *sync.WaitGroup) {
+	client_exit := false
+	for conn := range can {
+		fmt.Println("Nouveau client")
 		for !client_exit {
-			fmt.Println("Nouveau client")
+
 			var Aexist = false
 			var Bexist = false
 			var matrixA [][]int
@@ -105,37 +137,9 @@ func main() {
 				sendMatrix("matrixC", result, conn)
 			}
 		}
-
 	}
 }
-func sendMatrix(name string, m [][]int, conn net.Conn) error {
 
-	//Envoi le nom
-	fmt.Println(name)
-
-	wr := bufio.NewWriter(conn)
-	wr.WriteString(name + ":")
-	fmt.Println(len(m), ":", len(m[0]))
-	wr.WriteRune(int32(len(m)))
-	//wr.WriteString(":")
-	wr.WriteRune(int32(len(m[0])))
-
-	wr.Flush()
-
-	for _, row := range m {
-		for _, value := range row {
-			fmt.Printf("%d ", value)
-			wr.WriteRune(int32(value))
-		}
-		fmt.Println()
-	}
-	wr.WriteString("EOF\n")
-
-	wr.Flush()
-
-	return nil
-
-}
 func readMatrixFromClient(file io.Reader) ([][]int, error) {
 	scanner := bufio.NewScanner(file)
 	var mLength = 0
@@ -220,4 +224,35 @@ func lineXMatrix(lin []int, matrix [][]int, c chan line, index int) {
 	}
 	l.line = result
 	c <- l
+}
+func sendMatrix(name string, m [][]int, conn net.Conn) error {
+
+	//Envoi le nom
+	fmt.Println(name)
+
+	wr := bufio.NewWriter(conn)
+	wr.WriteString(name + ":")
+	fmt.Println(len(m), ":", len(m[0]))
+	wr.WriteRune(int32(len(m)))
+	//wr.WriteString(":")
+	wr.WriteRune(int32(len(m[0])))
+
+	wr.Flush()
+
+	for _, row := range m {
+		for _, value := range row {
+			fmt.Printf("%d ", int32(value))
+			_, err := wr.WriteRune(int32(value))
+			if err != nil {
+				fmt.Println("error:", err)
+			}
+		}
+		fmt.Println()
+	}
+	wr.WriteString("EOF\n")
+
+	wr.Flush()
+
+	return nil
+
 }
