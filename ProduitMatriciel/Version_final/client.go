@@ -41,8 +41,8 @@ func main() {
 			}
 			if s == "STOP" {
 				fmt.Println("TCP client exiting...")
-				wr := bufio.NewWriter(conn)
-				wr.WriteString("STOP:")
+				/*wr := bufio.NewWriter(conn)
+				wr.WriteString("STOP:")*/
 				conn.Close()
 				break
 			}
@@ -64,8 +64,6 @@ func main() {
 			}
 
 		} else if answer == "3" {
-			wr := bufio.NewWriter(conn)
-			wr.WriteString("STOP:")
 			conn.Close()
 			break
 		} else {
@@ -79,6 +77,7 @@ func client(conn net.Conn, file bool) (string, error) {
 	fmt.Println("You can end connection anytime by typing STOP")
 	var result [][]int
 	var matA string
+	var colA string
 	var matB string
 
 	//Demander le fichier des matrices
@@ -121,26 +120,28 @@ func client(conn net.Conn, file bool) (string, error) {
 				break
 			} else {
 				rowA, err = strconv.Atoi(matA)
-				fmt.Println("mat", matA, "row", rowA, "err", err)
 				if err == nil {
 					break
+				} else {
+					fmt.Println("Couldn't understand your input :(")
 				}
 			}
 		}
 		for true {
 			fmt.Println("Columns matrixA:")
-			fmt.Scanln(&matA)
-			if matA == "STOP" {
+			fmt.Scanln(&colA)
+			if colA == "STOP" {
 				return "STOP", nil
 			}
-			if matA == "random" {
+			if colA == "random" {
 				columnA = 0
 				break
 			} else {
-				columnA, err = strconv.Atoi(matA)
-				fmt.Println("mat", matA, "column", columnA, "err", err)
+				columnA, err = strconv.Atoi(colA)
 				if err == nil {
 					break
+				} else {
+					fmt.Println("Couldn't understand your input :(")
 				}
 			}
 		}
@@ -162,6 +163,8 @@ func client(conn net.Conn, file bool) (string, error) {
 				columnB, err = strconv.Atoi(matB)
 				if err == nil {
 					break
+				} else {
+					fmt.Println("Couldn't understand your input :(")
 				}
 			}
 

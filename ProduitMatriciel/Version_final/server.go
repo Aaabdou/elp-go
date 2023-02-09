@@ -40,41 +40,46 @@ func main() {
 	}
 
 	// Listen for an incoming connection.
-	go user(&running)
-	for running {
-		conn, err := l.Accept()
-
-		if err != nil {
-			fmt.Println("Error accepting: ", err.Error())
-			os.Exit(1)
-		}
-		chConn <- conn
-		fmt.Println("bb")
-
-	}
-	fmt.Println("aa")
-	close(chConn)
-}
-func user(run *bool) {
+	go connHandler(chConn, l, &running)
 	fmt.Println("If you want to close the server, type 1")
-	var answer string
-	for true {
+	for running {
+
+		var answer string
+
 		fmt.Scanln(&answer)
 		if answer == "1" {
-			*run = false
+			running = false
 			fmt.Println("exiting..")
 			break
 		} else {
 			fmt.Println("Didn't understand your request")
 			fmt.Println("If you want to close the server, type 1")
 		}
+
+	}
+	close(chConn)
+	wg.Wait()
+	fmt.Println("exited..")
+}
+
+func connHandler(chConn chan net.Conn, l net.Listener, running *bool) {
+	for *running {
+		conn, err := l.Accept()
+
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			os.Exit(1)
+		}
+		fmt.Println("New client connected")
+		chConn <- conn
+
 	}
 
 }
+
 func worker(can chan net.Conn, wg *sync.WaitGroup) {
 	client_exit := false
 	for conn := range can {
-		fmt.Println("New client")
 		for !client_exit {
 
 			var Aexist = false
@@ -86,7 +91,6 @@ func worker(can chan net.Conn, wg *sync.WaitGroup) {
 				rd := bufio.NewReader(conn)
 				ba, err := rd.ReadString(byte(':'))
 				name := strings.Trim(ba, ":")
-				fmt.Println(name)
 				if err != nil {
 					fmt.Println("Error encountered", err)
 					client_exit = true
@@ -101,7 +105,7 @@ func worker(can chan net.Conn, wg *sync.WaitGroup) {
 						break
 					}
 					ba = strings.Trim(ba, ":")
-					fileSize, _ := strconv.ParseInt(ba, 10, 64)
+					fileSize, _ := strconv.Atoi(ba)
 					fmt.Println(name, " size :", fileSize)
 					matrixA, err = readMatrixFromClient(rd)
 					if err != nil {
@@ -119,7 +123,7 @@ func worker(can chan net.Conn, wg *sync.WaitGroup) {
 						break
 					}
 					ba = strings.Trim(ba, ":")
-					fileSize, _ := strconv.ParseInt(ba, 10, 64)
+					fileSize, _ := strconv.Atoi(ba)
 					fmt.Println(name, " size :", fileSize)
 					matrixB, err = readMatrixFromClient(rd)
 					if err != nil {
@@ -143,6 +147,7 @@ func worker(can chan net.Conn, wg *sync.WaitGroup) {
 			}
 		}
 	}
+
 }
 
 func readMatrixFromClient(file io.Reader) ([][]int, error) {
@@ -163,7 +168,7 @@ func readMatrixFromClient(file io.Reader) ([][]int, error) {
 	}
 	b := scanner.Err()
 	if b != nil {
-		fmt.Println(b)
+		return nil, b
 	}
 
 	var matrix [][]int = make([][]int, mLength)
@@ -175,8 +180,6 @@ func readMatrixFromClient(file io.Reader) ([][]int, error) {
 		}
 		matrix[mLine.nb] = mLine.line
 	}
-
-	//fmt.Println(matrix)
 
 	return matrix, nil
 }
@@ -194,7 +197,6 @@ func readLine(c chan line, rowStrings []string, i int) {
 	}
 	//fmt.Println("row ", i, " ", row)
 	l.line = row
-	fmt.Println(l.nb, " : ", l.line, ":", l.err)
 	c <- l
 
 }
@@ -231,11 +233,10 @@ func lineXMatrix(lin []int, matrix [][]int, c chan line, index int) {
 func sendMatrix(name string, m [][]int, conn net.Conn) error {
 
 	//Envoi le nom
-	fmt.Println(name)
+	fmt.Println("Sending solution", name, "of size", len(m), "x", len(m[0]))
 
 	wr := bufio.NewWriter(conn)
 	wr.WriteString(name + ":")
-	fmt.Println(len(m), ":", len(m[0]))
 	wr.WriteRune(int32(len(m)))
 	//wr.WriteString(":")
 	wr.WriteRune(int32(len(m[0])))
@@ -244,14 +245,11 @@ func sendMatrix(name string, m [][]int, conn net.Conn) error {
 
 	for _, row := range m {
 		for _, value := range row {
-			//fmt.Printf("%d ", int32(value))
 			_, err := wr.WriteString(strconv.Itoa(value) + ":")
 			if err != nil {
 				fmt.Println("error:", err)
 			}
 		}
-
-		fmt.Println()
 	}
 	wr.WriteString("EOF\n")
 
